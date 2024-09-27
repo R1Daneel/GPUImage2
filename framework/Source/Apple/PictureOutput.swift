@@ -51,20 +51,44 @@ public class PictureOutput: ImageConsumer {
     
     // TODO: Replace with texture caches
     func cgImageFromFramebuffer(_ framebuffer:Framebuffer) -> CGImage {
-        let renderFramebuffer = sharedImageProcessingContext.framebufferCache.requestFramebufferWithProperties(orientation:framebuffer.orientation, size:framebuffer.size)
+        let renderFramebuffer = sharedImageProcessingContext.framebufferCache.requestFramebufferWithProperties(
+            orientation:framebuffer.orientation,
+            size:framebuffer.size
+        )
+        
         renderFramebuffer.lock()
         renderFramebuffer.activateFramebufferForRendering()
         clearFramebufferWithColor(Color.red)
-        renderQuadWithShader(sharedImageProcessingContext.passthroughShader, uniformSettings:ShaderUniformSettings(), vertexBufferObject:sharedImageProcessingContext.standardImageVBO, inputTextures:[framebuffer.texturePropertiesForOutputRotation(.noRotation)])
+        renderQuadWithShader(
+            sharedImageProcessingContext.passthroughShader,
+            uniformSettings:ShaderUniformSettings(),
+            vertexBufferObject:sharedImageProcessingContext.standardImageVBO,
+            inputTextures:[framebuffer.texturePropertiesForOutputRotation(.noRotation)]
+        )
         framebuffer.unlock()
         
         let imageByteSize = Int(framebuffer.size.width * framebuffer.size.height * 4)
         let data = UnsafeMutablePointer<UInt8>.allocate(capacity: imageByteSize)
         glReadPixels(0, 0, framebuffer.size.width, framebuffer.size.height, GLenum(GL_RGBA), GLenum(GL_UNSIGNED_BYTE), data)
         renderFramebuffer.unlock()
-        guard let dataProvider = CGDataProvider(dataInfo:nil, data:data, size:imageByteSize, releaseData: dataProviderReleaseCallback) else {fatalError("Could not allocate a CGDataProvider")}
-        let defaultRGBColorSpace = CGColorSpaceCreateDeviceRGB()
-        return CGImage(width:Int(framebuffer.size.width), height:Int(framebuffer.size.height), bitsPerComponent:8, bitsPerPixel:32, bytesPerRow:4 * Int(framebuffer.size.width), space:defaultRGBColorSpace, bitmapInfo:CGBitmapInfo() /*| CGImageAlphaInfo.Last*/, provider:dataProvider, decode:nil, shouldInterpolate:false, intent:.defaultIntent)!
+        
+        guard let dataProvider = CGDataProvider(dataInfo:nil, data:data, size:imageByteSize, releaseData: dataProviderReleaseCallback) else {
+            fatalError("Could not allocate a CGDataProvider")
+        }
+
+        return CGImage(
+            width: Int(framebuffer.size.width),
+            height: Int(framebuffer.size.height),
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: 4 * Int(framebuffer.size.width),
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue) /*| CGImageAlphaInfo.Last*/,
+            provider: dataProvider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )!
     }
     
     public func newFramebufferAvailable(_ framebuffer:Framebuffer, fromSourceIndex:UInt) {
